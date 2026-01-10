@@ -1,0 +1,28 @@
+<div style="display:flex">
+    <div style="width:70%">
+        <input id="username" placeholder="Username">
+        <input id="room" placeholder="Room">
+        <button onclick="joinRoom()">Join</button>
+        <button onclick="leaveRoom()">Leave</button>
+
+        <div id="chat" style="height:300px;border:1px solid #ccc;overflow:auto"></div>
+
+        <input id="message">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <div style="width:30%;padding-left:10px">
+        <h3>Active Users</h3>
+        <div id="active-users"></div>
+    </div>
+</div>
+
+<style>
+.user { display:flex; align-items:center; margin-bottom:6px }
+.dot {
+    width:10px; height:10px; background:green;
+    border-radius:50%; margin-right:6px
+}
+</style>
+
+<script src="/static/chat.js"></script>

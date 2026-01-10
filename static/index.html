@@ -1,0 +1,468 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chat</title>
+<style>
+/* Reset defaults */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(to right, #4facfe, #00f2fe);
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    min-height: 100vh;
+}
+
+h2 {
+    margin-bottom: 20px;
+    color: #fff;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+}
+
+.container {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    padding: 20px;
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.input-group label { font-weight: bold; align-self: center; }
+.input-group input {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+.input-group button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background-color: #4facfe;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+}
+
+.input-group button:hover {
+    background-color: #00f2fe;
+    transform: scale(1.05);
+}
+
+#chat {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f9f9f9;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    scroll-behavior: smooth;
+}
+
+#chat p {
+    padding: 6px 10px;
+    border-radius: 8px;
+    max-width: 80%;
+    opacity: 0;
+    transform: translateX(0);
+    animation: fadeIn 0.5s forwards;
+}
+
+#chat p.system {
+    background-color: #e0e0e0;
+    color: #555;
+    font-style: italic;
+    text-align: center;
+}
+
+#chat p.self {
+    background-color: #4facfe;
+    color: white;
+    align-self: flex-end;
+    transform: translateX(50px);
+}
+
+#chat p.other {
+    background-color: #00f2fe;
+    color: white;
+    align-self: flex-start;
+    transform: translateX(-50px);
+}
+
+#users {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    background: #f4f4f4;
+}
+
+#users p {
+    padding: 4px 6px;
+    border-radius: 4px;
+    background-color: #4facfe;
+    color: white;
+    margin-bottom: 4px;
+}
+
+#message-area {
+    display: flex;
+    gap: 10px;
+}
+
+#message {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+#sendBtn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background-color: #4facfe;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+}
+
+#sendBtn:hover { background-color: #00f2fe; transform: scale(1.05); }
+
+/* Animations */
+@keyframes fadeIn {
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .container { padding: 15px; }
+    #chat { height: 200px; }
+    #message-area { flex-direction: column; }
+    #message, #sendBtn { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<h2>Brosky's ChatRoom</h2>
+
+<div class="container">
+    <div class="input-group">
+        <label>Room:</label>
+        <input id="room" placeholder="1500">
+        <label>Username:</label>
+        <input id="username" placeholder="user1">
+        <button id="connectBtn">Connect</button>
+        <button id="logoutBtn" disabled>Log Out</button>
+    </div>
+
+    <div id="chat"></div>
+
+    <div id="message-area">
+        <input id="message" placeholder="Type message...">
+        <button id="sendBtn">Send</button>
+    </div>
+
+    <h3>Active Users:</h3>
+    <div id="users"></div>
+</div>
+
+<script>
+let chatWs = null;
+let usersWs = null;
+
+const chatDiv = document.getElementById("chat");
+const usersDiv = document.getElementById("users");
+const messageInput = document.getElementById("message");
+const connectBtn = document.getElementById("connectBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+
+function appendMessage(msg, type="system") {
+    const p = document.createElement("p");
+    p.textContent = msg;
+    p.className = type;
+    chatDiv.appendChild(p);
+    // Smooth scroll
+    chatDiv.scroll({ top: chatDiv.scrollHeight, behavior: 'smooth' });
+}
+
+connectBtn.onclick = () => {
+    const room = document.getElementById("room").value || "room1";
+    const username = document.getElementById("username").value || "user1";
+
+    chatWs = new WebSocket(`ws://${window.location.host}/ws/chat/${room}/${username}`);
+    chatWs.onmessage = (event) => {
+        const msg = event.data;
+        if(msg.startsWith(`${username}:`)) appendMessage(msg, "self");
+        else if(msg.includes("joined") || msg.includes("left")) appendMessage(msg, "system");
+        else appendMessage(msg, "other");
+    };
+    chatWs.onclose = () => appendMessage("⚠️ Disconnected from chat", "system");
+
+    usersWs = new WebSocket(`ws://${window.location.host}/ws/users/${room}`);
+    usersWs.onmessage = (event) => {
+        const users = JSON.parse(event.data);
+        usersDiv.innerHTML = users.map(u => `<p>${u}</p>`).join("");
+    };
+    usersWs.onclose = () => usersDiv.innerHTML = "<p>Disconnected</p>";
+
+    appendMessage(`🔵 You joined as ${username}`, "system");
+    connectBtn.disabled = true;
+    logoutBtn.disabled = false;
+};
+
+logoutBtn.onclick = () => {
+    if(chatWs) chatWs.close();
+    if(usersWs) usersWs.close();
+    appendMessage("🔴 You left the room. Page will refresh in 3 seconds...", "system");
+    usersDiv.innerHTML = "";
+
+    // Wait 3 seconds then reload
+    setTimeout(() => { location.reload(); }, 3000);
+};
+
+document.getElementById("sendBtn").onclick = () => {
+    if(chatWs && messageInput.value.trim() !== "") {
+        chatWs.send(messageInput.value);
+        messageInput.value = "";
+    }
+};
+
+messageInput.addEventListener("keypress", (e) => {
+    if(e.key === "Enter") document.getElementById("sendBtn").click();
+});
+</script>
+
+</body>
+</html>
+ -->
+
+
+
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FastAPI Chat</title>
+<style>
+/* Reset and styling */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(to right, #4facfe, #00f2fe);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    min-height: 100vh;
+    color: #333;
+}
+
+h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3); }
+
+.container {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    padding: 20px;
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.input-group label { font-weight: bold; align-self: center; }
+
+.input-group input {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+.input-group button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background-color: #4facfe;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+}
+
+.input-group button:hover { background-color: #00f2fe; transform: scale(1.05); }
+
+#chat {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f9f9f9;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    scroll-behavior: smooth;
+}
+
+#chat p { padding: 6px 10px; border-radius: 8px; max-width: 80%; opacity: 0; transform: translateX(0); animation: fadeIn 0.5s forwards; }
+
+#chat p.system { background-color: #e0e0e0; color: #555; font-style: italic; text-align: center; }
+#chat p.self { background-color: #4facfe; color: white; align-self: flex-end; transform: translateX(50px); }
+#chat p.other { background-color: #00f2fe; color: white; align-self: flex-start; transform: translateX(-50px); }
+
+#users {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    background: #f4f4f4;
+}
+#users p {
+    padding: 4px 6px;
+    border-radius: 4px;
+    background-color: #4facfe;
+    color: white;
+    margin-bottom: 4px;
+}
+
+#message-area { display: flex; gap: 10px; }
+#message { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+#sendBtn { padding: 8px 16px; border: none; border-radius: 6px; background-color: #4facfe; color: white; font-weight: bold; cursor: pointer; transition: background 0.3s, transform 0.2s; }
+#sendBtn:hover { background-color: #00f2fe; transform: scale(1.05); }
+
+@keyframes fadeIn { to { opacity: 1; transform: translateX(0); } }
+
+@media (max-width: 600px) {
+    .container { padding: 15px; }
+    #chat { height: 200px; }
+    #message-area { flex-direction: column; }
+    #message, #sendBtn { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<h2>FastAPI Chat</h2>
+
+<div class="container">
+    <div class="input-group">
+        <label>Room:</label>
+        <input id="room" placeholder="1500">
+        <label>Username:</label>
+        <input id="username" placeholder="user1">
+        <button id="connectBtn">Connect</button>
+        <button id="logoutBtn" disabled>Log Out</button>
+    </div>
+
+    <div id="chat"></div>
+
+    <div id="message-area">
+        <input id="message" placeholder="Type message...">
+        <button id="sendBtn">Send</button>
+    </div>
+
+    <h3>Active Users:</h3>
+    <div id="users"></div>
+</div>
+
+<script>
+let chatWs = null;
+let usersWs = null;
+
+const chatDiv = document.getElementById("chat");
+const usersDiv = document.getElementById("users");
+const messageInput = document.getElementById("message");
+const connectBtn = document.getElementById("connectBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+
+function appendMessage(msg, type="system") {
+    const p = document.createElement("p");
+    p.textContent = msg;
+    p.className = type;
+    chatDiv.appendChild(p);
+    chatDiv.scroll({ top: chatDiv.scrollHeight, behavior: 'smooth' });
+}
+
+connectBtn.onclick = () => {
+    const room = document.getElementById("room").value || "room1";
+    const username = document.getElementById("username").value || "user1";
+
+    const wsProtocol = location.protocol === "https:" ? "wss" : "ws";
+
+    chatWs = new WebSocket(`${wsProtocol}://${window.location.host}/ws/chat/${room}/${username}`);
+    chatWs.onmessage = (event) => {
+        const msg = event.data;
+        if(msg.startsWith(`${username}:`)) appendMessage(msg, "self");
+        else if(msg.includes("joined") || msg.includes("left")) appendMessage(msg, "system");
+        else appendMessage(msg, "other");
+    };
+    chatWs.onclose = () => appendMessage("⚠️ Disconnected from chat", "system");
+
+    usersWs = new WebSocket(`${wsProtocol}://${window.location.host}/ws/users/${room}`);
+    usersWs.onmessage = (event) => {
+        const users = JSON.parse(event.data);
+        usersDiv.innerHTML = users.map(u => `<p>${u}</p>`).join("");
+    };
+    usersWs.onclose = () => usersDiv.innerHTML = "<p>Disconnected</p>";
+
+    appendMessage(`🔵 You joined as ${username}`, "system");
+    connectBtn.disabled = true;
+    logoutBtn.disabled = false;
+};
+
+logoutBtn.onclick = () => {
+    if(chatWs) chatWs.close();
+    if(usersWs) usersWs.close();
+    appendMessage("🔴 You left the room. Page will refresh in 3 seconds...", "system");
+    usersDiv.innerHTML = "";
+
+    setTimeout(() => { location.reload(); }, 3000);
+};
+
+document.getElementById("sendBtn").onclick = () => {
+    if(chatWs && messageInput.value.trim() !== "") {
+        chatWs.send(messageInput.value);
+        messageInput.value = "";
+    }
+};
+
+messageInput.addEventListener("keypress", (e) => {
+    if(e.key === "Enter") document.getElementById("sendBtn").click();
+});
+</script>
+
+</body>
+</html>
