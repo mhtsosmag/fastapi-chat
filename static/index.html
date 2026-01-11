@@ -73,11 +73,11 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     scroll-behavior: smooth;
 }
 
-#chat p { padding: 6px 10px; border-radius: 8px; max-width: 80%; }
+#chat p { padding: 6px 10px; border-radius: 8px; max-width: 80%; opacity: 0; transform: translateX(0); animation: fadeIn 0.5s forwards; }
 
-#chat p.system { background-color: #e0e0e0; color: #555; text-align: center; }
-#chat p.self { background-color: #4facfe; color: white; align-self: flex-end; }
-#chat p.other { background-color: #00f2fe; color: white; align-self: flex-start; }
+#chat p.system { background-color: #e0e0e0; color: #555; font-style: italic; text-align: center; }
+#chat p.self { background-color: #4facfe; color: white; align-self: flex-end; transform: translateX(50px); }
+#chat p.other { background-color: #00f2fe; color: white; align-self: flex-start; transform: translateX(-50px); }
 
 #users {
     border: 1px solid #ddd;
@@ -100,7 +100,7 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     position: relative;
 }
 
-#message { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; }
+#message { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
 
 #sendBtn, #emojiBtn, #photoBtn {
     padding: 8px 16px;
@@ -110,7 +110,10 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     color: white;
     font-weight: bold;
     cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
 }
+
+#sendBtn:hover, #emojiBtn:hover, #photoBtn:hover { background-color: #00f2fe; transform: scale(1.05); }
 
 .emoji-panel {
     display: none;
@@ -124,9 +127,13 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     position: absolute;
     top: -120px;
     left: 0;
+    z-index: 10;
 }
 
-.emoji-panel span { cursor: pointer; font-size: 20px; }
+.emoji-panel span {
+    cursor: pointer;
+    font-size: 20px;
+}
 
 #photos-history {
     border: 1px solid #ddd;
@@ -146,10 +153,19 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     border-radius: 6px;
     cursor: pointer;
 }
+
+@keyframes fadeIn { to { opacity: 1; transform: translateX(0); } }
+
+@media (max-width: 600px) {
+    .container { padding: 15px; }
+    #chat { height: 200px; }
+    #message-area { flex-direction: column; }
+    #message, #sendBtn, #emojiBtn, #photoBtn { width: 100%; }
+}
 </style>
 </head>
-
 <body>
+
 <h2>FastAPI Chat</h2>
 
 <div class="container">
@@ -165,13 +181,13 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     <div id="chat"></div>
 
     <div id="message-area">
-        <button id="emojiBtn">😊</button>
+        <button id="emojiBtn" title="Emojis">😊</button>
         <div id="emojiPanel" class="emoji-panel">
             😀 😁 😂 🤣 😊 😎 😍 😘 😜 🤔 😢 😭 😡 👍 👎 👏 🙌 🎉 ❤️ 🔥 🚀
         </div>
 
-        <button id="photoBtn">📷</button>
-        <input type="file" id="photoInput" hidden accept="image/*">
+        <button id="photoBtn" title="Upload Photo">📷</button>
+        <input type="file" id="photoInput" style="display:none" accept="image/*">
 
         <input id="message" placeholder="Type message...">
         <button id="sendBtn">Send</button>
@@ -186,8 +202,6 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
 
 <script>
 let chatWs = null;
-let usersWs = null;
-
 const chatDiv = document.getElementById("chat");
 const usersDiv = document.getElementById("users");
 const messageInput = document.getElementById("message");
@@ -206,39 +220,37 @@ function appendMessage(msg, type="system") {
     p.textContent = msg;
     p.className = type;
     chatDiv.appendChild(p);
-    chatDiv.scrollTop = chatDiv.scrollHeight;
+    chatDiv.scroll({ top: chatDiv.scrollHeight, behavior: 'smooth' });
 }
 
 /* CONNECT */
 connectBtn.onclick = () => {
     const room = document.getElementById("room").value || "room1";
     const username = document.getElementById("username").value || "user1";
-    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const wsProtocol = location.protocol === "https:" ? "wss" : "ws";
 
-    chatWs = new WebSocket(`${proto}://${location.host}/ws/chat/${room}/${username}`);
-    usersWs = new WebSocket(`${proto}://${location.host}/ws/users/${room}`);
+    chatWs = new WebSocket(`${wsProtocol}://${window.location.host}/ws/chat/${room}/${username}`);
 
-    chatWs.onmessage = e => {
-        const msg = e.data;
-        if (msg.startsWith("[PHOTO]")) {
-            const url = msg.replace("[PHOTO]", "");
+    chatWs.onmessage = (event) => {
+        const msg = event.data;
+
+        if(msg.startsWith("[PHOTO]")) {
+            const photoUrl = msg.replace("[PHOTO]", "");
             const img = document.createElement("img");
-            img.src = url;
-            img.onclick = () => window.open(url);
+            img.src = photoUrl;
+            img.title = "Photo";
+            img.onclick = () => window.open(photoUrl, "_blank");
             photosHistory.appendChild(img);
-        } else if (msg.startsWith(username + ":")) {
+        } else if(msg.startsWith(`${username}:`)) {
             appendMessage(msg, "self");
-        } else if (msg.includes("joined") || msg.includes("left")) {
-            appendMessage(msg, "system");
+        } else if(msg.includes("joined") || msg.includes("left") || msg.startsWith("[SYSTEM]")) {
+            appendMessage(msg.replace("[SYSTEM]",""), "system");
         } else {
             appendMessage(msg, "other");
         }
     };
 
-    usersWs.onmessage = e => {
-        const users = JSON.parse(e.data);
-        usersDiv.innerHTML = users.map(u => `<p>${u}</p>`).join("");
-    };
+    chatWs.onclose = () => appendMessage("⚠️ Disconnected from chat","system");
 
     appendMessage(`🔵 You joined as ${username}`, "system");
     connectBtn.disabled = true;
@@ -247,36 +259,48 @@ connectBtn.onclick = () => {
 
 /* LOGOUT */
 logoutBtn.onclick = () => {
-    if (chatWs) chatWs.close();
-    if (usersWs) usersWs.close();
-    appendMessage("🔴 You left the room. Reloading...", "system");
+    if(chatWs) chatWs.close();
+    appendMessage("🔴 You left the room. Page will refresh in 3 seconds...", "system");
     setTimeout(() => location.reload(), 3000);
 };
 
-/* SEND */
-sendBtn.onclick = () => {
-    if (chatWs && messageInput.value.trim()) {
+/* SEND MESSAGE */
+document.getElementById("sendBtn").onclick = () => {
+    if(chatWs && messageInput.value.trim() !== "") {
         chatWs.send(messageInput.value);
         messageInput.value = "";
     }
 };
+messageInput.addEventListener("keypress", e => { if(e.key==="Enter") document.getElementById("sendBtn").click(); });
 
-/* EMOJI */
+/* EMOJI PICKER */
 emojiPanel.innerHTML = emojiPanel.textContent.split(" ").map(e => `<span>${e}</span>`).join("");
 emojiBtn.onclick = () => emojiPanel.style.display = emojiPanel.style.display === "flex" ? "none" : "flex";
-emojiPanel.onclick = e => {
-    if (e.target.tagName === "SPAN") messageInput.value += e.target.textContent;
-};
+emojiPanel.addEventListener("click", e => {
+    if(e.target.tagName==="SPAN") { messageInput.value += e.target.textContent; messageInput.focus(); }
+});
+document.addEventListener("click", e => {
+    if(!emojiBtn.contains(e.target) && !emojiPanel.contains(e.target)) emojiPanel.style.display = "none";
+});
 
-/* PHOTO */
+/* PHOTO UPLOAD */
 photoBtn.onclick = () => photoInput.click();
-photoInput.onchange = () => {
+photoInput.addEventListener("change", () => {
     const file = photoInput.files[0];
-    if (!file) return;
+    if(!file) return;
+
     const reader = new FileReader();
-    reader.onload = () => chatWs.send("[PHOTO]" + reader.result);
+    reader.onload = () => {
+        const img = document.createElement("img");
+        img.src = reader.result;
+        img.title = "Photo";
+        img.onclick = () => window.open(img.src,"_blank");
+        photosHistory.appendChild(img);
+
+        if(chatWs) chatWs.send(`[PHOTO]${reader.result}`);
+    };
     reader.readAsDataURL(file);
-};
+});
 </script>
 </body>
 </html>
