@@ -155,3 +155,9 @@ async def users_ws(ws: WebSocket, room: str):
                 await ws.send_text(str(users_in_room[room]))
     except:
         pass
+
+
+from fastapi.responses import FileResponse
+@app.get("/")
+async def root():
+    return FileResponse("static/index.html")
