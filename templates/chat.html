@@ -1,28 +1,76 @@
-<div style="display:flex">
-    <div style="width:70%">
-        <input id="username" placeholder="Username">
-        <input id="room" placeholder="Room">
-        <button onclick="joinRoom()">Join</button>
-        <button onclick="leaveRoom()">Leave</button>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FastAPI Chat</title>
+    <link rel="stylesheet" href="/static/chat.css">
+</head>
+<body>
 
-        <div id="chat" style="height:300px;border:1px solid #ccc;overflow:auto"></div>
+<div class="app">
+    <!-- CHAT AREA -->
+    <div class="chat-area">
+        <div class="top-bar">
+            <input id="username" placeholder="Username">
+            <input id="room" placeholder="Room">
+            <button onclick="joinRoom()">Join</button>
+            <button onclick="leaveRoom()">Leave</button>
+        </div>
 
-        <input id="message">
-        <button onclick="sendMessage()">Send</button>
+        <div id="chat"></div>
+
+        <div class="message-bar">
+            <div class="emoji-wrapper">
+                <button id="emojiBtn" title="Emojis">😊</button>
+                <div id="emojiPanel" class="emoji-panel">
+                    😀 😁 😂 🤣 😊 😎 😍 😘 😜 🤔 😢 😭 😡 👍 👎 👏 🙌 🎉 ❤️ 🔥 🚀
+                </div>
+            </div>
+
+            <input id="message" placeholder="Type a message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
     </div>
 
-    <div style="width:30%;padding-left:10px">
+    <!-- USERS -->
+    <div class="users-area">
         <h3>Active Users</h3>
         <div id="active-users"></div>
     </div>
 </div>
 
-<style>
-.user { display:flex; align-items:center; margin-bottom:6px }
-.dot {
-    width:10px; height:10px; background:green;
-    border-radius:50%; margin-right:6px
-}
-</style>
-
 <script src="/static/chat.js"></script>
+
+<script>
+/* Emoji logic */
+const emojiBtn = document.getElementById("emojiBtn");
+const emojiPanel = document.getElementById("emojiPanel");
+const messageInput = document.getElementById("message");
+
+/* Convert emojis to clickable spans */
+emojiPanel.innerHTML = emojiPanel.textContent
+    .split(" ")
+    .map(e => `<span>${e}</span>`)
+    .join("");
+
+emojiBtn.onclick = () => {
+    emojiPanel.style.display =
+        emojiPanel.style.display === "flex" ? "none" : "flex";
+};
+
+emojiPanel.addEventListener("click", (e) => {
+    if (e.target.tagName === "SPAN") {
+        messageInput.value += e.target.textContent;
+        messageInput.focus();
+    }
+});
+
+document.addEventListener("click", (e) => {
+    if (!emojiBtn.contains(e.target) && !emojiPanel.contains(e.target)) {
+        emojiPanel.style.display = "none";
+    }
+});
+</script>
+
+</body>
+</html>
