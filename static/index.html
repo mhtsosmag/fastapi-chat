@@ -3,181 +3,72 @@
 <head>
 <meta charset="UTF-8">
 <title>FastAPI Chat</title>
-
 <style>
-/* Reset */
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
+/* RESET */
+* { box-sizing: border-box; margin:0; padding:0; }
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(to right, #4facfe, #00f2fe);
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: #333;
+    display:flex; flex-direction:column; align-items:center; padding:20px; min-height:100vh; color:#333;
 }
+
+h2 { margin-bottom:20px; color:#fff; text-shadow:1px 1px 3px rgba(0,0,0,0.3); }
 
 .container {
-    background: #fff;
-    width: 100%;
-    max-width: 600px;
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+    background:#fff; border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,0.2);
+    padding:20px; width:100%; max-width:600px; display:flex; flex-direction:column; gap:15px;
 }
 
-h2 {
-    text-align: center;
-    color: #4facfe;
-}
-
-.input-group {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.input-group input {
-    flex: 1;
-    padding: 8px 10px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-}
-
-.input-group button {
-    padding: 8px 14px;
-    border: none;
-    border-radius: 6px;
-    background: #4facfe;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.input-group button:hover {
-    background: #00f2fe;
-}
+.input-group { display:flex; gap:10px; flex-wrap:wrap; }
+.input-group label { font-weight:bold; align-self:center; }
+.input-group input { flex:1; padding:8px 12px; border-radius:6px; border:1px solid #ccc; font-size:14px; }
+.input-group button { padding:8px 16px; border:none; border-radius:6px; background-color:#4facfe; color:white; font-weight:bold; cursor:pointer; transition:0.3s; }
+.input-group button:hover { background-color:#00f2fe; transform:scale(1.05); }
 
 #chat {
-    height: 280px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 10px;
-    overflow-y: auto;
-    background: #f9f9f9;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    border:1px solid #ddd; border-radius:8px; height:300px; overflow-y:auto; padding:10px; background:#f9f9f9; display:flex; flex-direction:column; gap:6px; scroll-behavior:smooth;
 }
 
-#chat p {
-    padding: 6px 10px;
-    border-radius: 8px;
-    max-width: 80%;
-}
+#chat p { padding:6px 10px; border-radius:8px; max-width:80%; animation:fadeIn 0.5s forwards; }
+#chat p.system { background:#e0e0e0; color:#555; font-style:italic; text-align:center; }
+#chat p.self { background:#4facfe; color:white; align-self:flex-end; }
+#chat p.other { background:#00f2fe; color:white; align-self:flex-start; }
 
-.system {
-    background: #e0e0e0;
-    text-align: center;
-    font-style: italic;
-}
+#users { border:1px solid #ddd; border-radius:8px; padding:10px; background:#f4f4f4; }
+#users p { padding:4px 6px; border-radius:4px; background-color:#4facfe; color:white; margin-bottom:4px; }
 
-.self {
-    background: #4facfe;
-    color: white;
-    align-self: flex-end;
-}
+#message-area { display:flex; gap:10px; }
+#message { flex:1; padding:8px 12px; border-radius:6px; border:1px solid #ccc; font-size:14px; }
+#sendBtn { padding:8px 16px; border:none; border-radius:6px; background-color:#4facfe; color:white; font-weight:bold; cursor:pointer; transition:0.3s; }
+#sendBtn:hover { background-color:#00f2fe; transform:scale(1.05); }
 
-.other {
-    background: #00f2fe;
-    color: white;
-    align-self: flex-start;
-}
+#emojiBtn, #photoBtn { font-size:22px; background:none; border:none; cursor:pointer; }
+.emoji-panel { display:none; flex-wrap:wrap; gap:4px; background:#fff; border:1px solid #ccc; padding:5px; position:absolute; z-index:100; }
+.emoji-panel span { cursor:pointer; }
 
-/* MESSAGE BAR */
-.message-area {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
+.chat-image { max-width:220px; border-radius:10px; margin-top:4px; }
 
-/* EMOJI */
-.emoji-wrapper {
-    position: relative;
-}
+@keyframes fadeIn { to { opacity:1; transform:translateX(0); } }
 
-#emojiBtn {
-    font-size: 22px;
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-
-.emoji-panel {
-    position: absolute;
-    bottom: 40px;
-    left: 0;
-    background: white;
-    border-radius: 10px;
-    padding: 8px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-    display: none;
-    flex-wrap: wrap;
-    gap: 6px;
-    width: 220px;
-}
-
-.emoji-panel span {
-    cursor: pointer;
-    font-size: 20px;
-}
-
-#message {
-    flex: 1;
-    padding: 8px 10px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-}
-
-#sendBtn {
-    padding: 8px 14px;
-    border: none;
-    border-radius: 6px;
-    background: #4facfe;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-#sendBtn:hover {
-    background: #00f2fe;
-}
-
-#users {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 8px;
-    background: #f4f4f4;
+@media (max-width:600px) {
+    .container { padding:15px; }
+    #chat { height:200px; }
+    #message-area { flex-direction:column; }
+    #message, #sendBtn { width:100%; }
 }
 </style>
 </head>
-
 <body>
 
-<div class="container">
-    <h2>FastAPI Chat</h2>
+<h2>FastAPI Chat</h2>
 
+<div class="container">
     <div class="input-group">
-        <input id="room" placeholder="Room">
-        <input id="username" placeholder="Username">
+        <label>Room:</label>
+        <input id="room" placeholder="1500">
+        <label>Username:</label>
+        <input id="username" placeholder="user1">
         <button id="connectBtn">Connect</button>
         <button id="logoutBtn" disabled>Log Out</button>
     </div>
@@ -185,18 +76,17 @@ h2 {
     <div id="chat"></div>
 
     <div class="message-area">
-        <div class="emoji-wrapper">
-            <button id="emojiBtn">😊</button>
-            <div id="emojiPanel" class="emoji-panel">
-                😀 😁 😂 🤣 😊 😎 😍 😘 😜 🤔 😢 😭 😡 👍 👎 👏 🙌 🎉 ❤️ 🔥 🚀
-            </div>
-        </div>
+        <button id="emojiBtn">😊</button>
+        <div id="emojiPanel" class="emoji-panel">😀 😁 😂 🤣 😊 😎 😍 😘 😜 🤔 😢 😭 😡 👍 👎 👏 🙌 🎉 ❤️ 🔥 🚀</div>
+
+        <button id="photoBtn">📷</button>
+        <input type="file" id="photoInput" accept="image/*" hidden>
 
         <input id="message" placeholder="Type message...">
         <button id="sendBtn">Send</button>
     </div>
 
-    <h4>Active Users</h4>
+    <h3>Active Users:</h3>
     <div id="users"></div>
 </div>
 
@@ -210,86 +100,94 @@ const messageInput = document.getElementById("message");
 const connectBtn = document.getElementById("connectBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 
-/* CHAT */
-function appendMessage(msg, type="system") {
+function appendMessage(content, type="system", isImage=false){
     const p = document.createElement("p");
-    p.textContent = msg;
     p.className = type;
+
+    if(isImage){
+        const img = document.createElement("img");
+        img.src = content;
+        img.className = "chat-image";
+        p.appendChild(img);
+    } else {
+        p.textContent = content;
+    }
+
     chatDiv.appendChild(p);
     chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
-connectBtn.onclick = () => {
-    const room = document.getElementById("room").value || "room1";
-    const username = document.getElementById("username").value || "user";
-
-    const proto = location.protocol === "https:" ? "wss" : "ws";
-
-    chatWs = new WebSocket(`${proto}://${location.host}/ws/chat/${room}/${username}`);
-    usersWs = new WebSocket(`${proto}://${location.host}/ws/users/${room}`);
-
-    chatWs.onmessage = e => {
-        const msg = e.data;
-        if (msg.startsWith(username + ":")) appendMessage(msg, "self");
-        else if (msg.includes("joined") || msg.includes("left")) appendMessage(msg, "system");
-        else appendMessage(msg, "other");
-    };
-
-    usersWs.onmessage = e => {
-        const users = JSON.parse(e.data);
-        usersDiv.innerHTML = users.map(u => `<p>${u}</p>`).join("");
-    };
-
-    appendMessage(`🔵 You joined as ${username}`, "system");
-    connectBtn.disabled = true;
-    logoutBtn.disabled = false;
-};
-
-logoutBtn.onclick = () => {
-    if (chatWs) chatWs.close();
-    if (usersWs) usersWs.close();
-    appendMessage("🔴 You left. Reloading...", "system");
-    setTimeout(() => location.reload(), 3000);
-};
-
-document.getElementById("sendBtn").onclick = () => {
-    if (chatWs && messageInput.value.trim()) {
-        chatWs.send(messageInput.value);
-        messageInput.value = "";
-    }
-};
-
-messageInput.addEventListener("keydown", e => {
-    if (e.key === "Enter") document.getElementById("sendBtn").click();
-});
-
-/* EMOJI LOGIC */
+// Emoji
 const emojiBtn = document.getElementById("emojiBtn");
 const emojiPanel = document.getElementById("emojiPanel");
-
-emojiPanel.innerHTML = emojiPanel.textContent
-    .split(" ")
-    .map(e => `<span>${e}</span>`)
-    .join("");
-
-emojiBtn.onclick = () => {
-    emojiPanel.style.display =
-        emojiPanel.style.display === "flex" ? "none" : "flex";
-};
-
-emojiPanel.onclick = e => {
-    if (e.target.tagName === "SPAN") {
-        messageInput.value += e.target.textContent;
-        messageInput.focus();
-    }
-};
-
-document.addEventListener("click", e => {
-    if (!emojiBtn.contains(e.target) && !emojiPanel.contains(e.target)) {
-        emojiPanel.style.display = "none";
-    }
+emojiPanel.innerHTML = emojiPanel.textContent.split(" ").map(e=>`<span>${e}</span>`).join("");
+emojiBtn.onclick = ()=>emojiPanel.style.display = emojiPanel.style.display==="flex"?"none":"flex";
+emojiPanel.addEventListener("click", e=>{
+    if(e.target.tagName==="SPAN"){ messageInput.value += e.target.textContent; messageInput.focus(); }
 });
-</script>
+document.addEventListener("click", e=>{
+    if(!emojiBtn.contains(e.target) && !emojiPanel.contains(e.target)) emojiPanel.style.display="none";
+});
 
+// Photo
+const photoBtn = document.getElementById("photoBtn");
+const photoInput = document.getElementById("photoInput");
+photoBtn.onclick = ()=>photoInput.click();
+photoInput.onchange = async ()=>{
+    const file = photoInput.files[0];
+    if(!file || !chatWs) return;
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/upload", {method:"POST", body:formData});
+    const data = await res.json();
+
+    chatWs.send("[image]" + data.url);
+    appendMessage(data.url,"self",true);
+    photoInput.value="";
+};
+
+// Connect
+connectBtn.onclick = ()=>{
+    const room = document.getElementById("room").value || "room1";
+    const username = document.getElementById("username").value || "user1";
+    const wsProtocol = location.protocol==="https:"?"wss":"ws";
+
+    chatWs = new WebSocket(`${wsProtocol}://${window.location.host}/ws/chat/${room}/${username}`);
+    chatWs.onmessage = e=>{
+        const msg = e.data;
+        if(msg.startsWith("[image]")) appendMessage(msg.replace("[image]",""),"other",true);
+        else if(msg.startsWith(username+":")) appendMessage(msg,"self");
+        else if(msg.includes("joined") || msg.includes("left")) appendMessage(msg,"system");
+        else appendMessage(msg,"other");
+    };
+    chatWs.onclose = ()=>appendMessage("⚠️ Disconnected from chat","system");
+
+    usersWs = new WebSocket(`${wsProtocol}://${window.location.host}/ws/users/${room}`);
+    usersWs.onmessage = e=>{ usersDiv.innerHTML = JSON.parse(e.data).map(u=>`<p>${u}</p>`).join(""); };
+    usersWs.onclose = ()=>usersDiv.innerHTML="<p>Disconnected</p>";
+
+    appendMessage(`🔵 You joined as ${username}`,"system");
+    connectBtn.disabled=true; logoutBtn.disabled=false;
+};
+
+// Logout
+logoutBtn.onclick = ()=>{
+    if(chatWs) chatWs.close();
+    if(usersWs) usersWs.close();
+    appendMessage("🔴 You left the room. Page refresh in 3s...","system");
+    usersDiv.innerHTML="";
+    setTimeout(()=>{ location.reload(); },3000);
+};
+
+// Send message
+document.getElementById("sendBtn").onclick = ()=>{
+    if(chatWs && messageInput.value.trim()!==""){
+        chatWs.send(messageInput.value);
+        messageInput.value="";
+    }
+};
+messageInput.addEventListener("keypress", e=>{ if(e.key==="Enter") document.getElementById("sendBtn").click(); });
+</script>
 </body>
 </html>

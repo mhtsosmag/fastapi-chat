@@ -1,55 +1,9 @@
 
 """ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse  # <-- import here
-from manager import ConnectionManager 
-
-app = FastAPI()
-manager = ConnectionManager()
-
-# Serve static files from "static" folder
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Add a route for "/" to serve index.html
-@app.get("/")
-async def root():
-    return FileResponse("static/index.html")  # <-- put here
-
-# WebSocket route for chat
-@app.websocket("/ws/chat/{room}/{username}")
-async def chat_ws(websocket: WebSocket, room: str, username: str):
-    await manager.connect_chat(room, username, websocket)
-    await manager.broadcast_chat(room, f"🔵 {username} joined the room")
-    await manager.broadcast_users(room)
-
-    try:
-        while True:
-            msg = await websocket.receive_text()
-            await manager.broadcast_chat(room, f"{username}: {msg}")
-    except WebSocketDisconnect:
-        manager.disconnect_chat(room, username)
-        await manager.broadcast_chat(room, f"🔴 {username} left the room")
-        await manager.broadcast_users(room)
-
-# WebSocket route for user list
-@app.websocket("/ws/users/{room}")
-async def users_ws(websocket: WebSocket, room: str):
-    await manager.connect_users(room, websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect_users(room, websocket)
-        await manager.broadcast_users(room) """
-
-
-
-
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from typing import Dict, List
+
 
 app = FastAPI()
 
@@ -121,4 +75,83 @@ async def users_ws(websocket: WebSocket, room: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect_users(room, websocket)
+ """
 
+
+from fastapi import FastAPI, WebSocket, UploadFile, File
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+import os
+import uuid
+
+app = FastAPI()
+
+# Allow CORS for testing on mobile
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+UPLOAD_DIR = "static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Serve index.html
+@app.get("/")
+async def root():
+    return FileResponse("static/index.html")
+
+# Image upload endpoint
+@app.post("/upload")
+async def upload_image(file: UploadFile = File(...)):
+    ext = file.filename.split(".")[-1]
+    filename = f"{uuid.uuid4()}.{ext}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+
+    return JSONResponse({"url": f"/static/uploads/{filename}"})
+
+
+# --- SIMPLE CHAT WEBSOCKET ---
+rooms = {}   # room -> set of websockets
+users_in_room = {}  # room -> list of usernames
+
+@app.websocket("/ws/chat/{room}/{username}")
+async def chat_ws(ws: WebSocket, room: str, username: str):
+    await ws.accept()
+    rooms.setdefault(room, set()).add(ws)
+    users_in_room.setdefault(room, []).append(username)
+
+    # Notify joined
+    msg = f"{username} joined"
+    for client in rooms[room]:
+        await client.send_text(msg)
+
+    try:
+        while True:
+            data = await ws.receive_text()
+            # broadcast to all
+            for client in rooms[room]:
+                await client.send_text(f"{username}: {data}" if not data.startswith("[image]") else data)
+    except:
+        pass
+    finally:
+        rooms[room].remove(ws)
+        users_in_room[room].remove(username)
+        leave_msg = f"{username} left"
+        for client in rooms[room]:
+            await client.send_text(leave_msg)
+
+
+@app.websocket("/ws/users/{room}")
+async def users_ws(ws: WebSocket, room: str):
+    await ws.accept()
+    try:
+        while True:
+            if room in users_in_room:
+                await ws.send_text(str(users_in_room[room]))
+    except:
+        pass
