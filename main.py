@@ -1,84 +1,5 @@
 
 """ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from typing import Dict, List
-
-
-app = FastAPI()
-
-# Connection Manager
-class ConnectionManager:
-    def __init__(self):
-        self.chat_sockets: Dict[str, Dict[str, WebSocket]] = {}  # room -> username -> ws
-        self.user_sockets: Dict[str, List[WebSocket]] = {}       # room -> ws list
-
-    async def connect_chat(self, room: str, username: str, websocket: WebSocket):
-        await websocket.accept()
-        self.chat_sockets.setdefault(room, {})
-        self.chat_sockets[room][username] = websocket
-
-    async def connect_users(self, room: str, websocket: WebSocket):
-        await websocket.accept()
-        self.user_sockets.setdefault(room, []).append(websocket)
-        await websocket.send_json(list(self.chat_sockets.get(room, {}).keys()))
-
-    def disconnect_chat(self, room: str, username: str):
-        if room in self.chat_sockets and username in self.chat_sockets[room]:
-            del self.chat_sockets[room][username]
-
-    def disconnect_users(self, room: str, websocket: WebSocket):
-        if room in self.user_sockets and websocket in self.user_sockets[room]:
-            self.user_sockets[room].remove(websocket)
-
-    async def broadcast_chat(self, room: str, message: str):
-        for ws in self.chat_sockets.get(room, {}).values():
-            await ws.send_text(message)
-
-    async def broadcast_users(self, room: str):
-        users = list(self.chat_sockets.get(room, {}).keys())
-        for ws in self.user_sockets.get(room, []):
-            await ws.send_json(users)
-
-manager = ConnectionManager()
-
-# Serve static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Serve index.html
-@app.get("/")
-async def root():
-    return FileResponse("static/index.html")
-
-# WebSocket endpoints
-@app.websocket("/ws/chat/{room}/{username}")
-async def chat_ws(websocket: WebSocket, room: str, username: str):
-    await manager.connect_chat(room, username, websocket)
-    await manager.broadcast_chat(room, f"🔵 {username} joined the room")
-    await manager.broadcast_users(room)
-
-    try:
-        while True:
-            msg = await websocket.receive_text()
-            await manager.broadcast_chat(room, f"{username}: {msg}")
-
-    except WebSocketDisconnect:
-        manager.disconnect_chat(room, username)
-        await manager.broadcast_chat(room, f"🔴 {username} left the room")
-        await manager.broadcast_users(room)
-
-@app.websocket("/ws/users/{room}")
-async def users_ws(websocket: WebSocket, room: str):
-    await manager.connect_users(room, websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect_users(room, websocket)
- """
-
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List, Dict
@@ -162,4 +83,91 @@ async def users_endpoint(websocket: WebSocket, room: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass
+ """
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from typing import List, Dict
+import os
+import base64
+import uuid
+
+app = FastAPI()
+
+# Serve static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Folder to store uploaded photos
+UPLOAD_DIR = "static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@app.get("/")
+async def get_index():
+    return FileResponse("static/index.html")
+
+
+# ---------------- WebSocket Chat ----------------
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}  # room -> list of websockets
+        self.usernames: Dict[WebSocket, str] = {}
+        self.photos: Dict[str, List[str]] = {}  # room -> list of photo URLs
+
+    async def connect(self, websocket: WebSocket, room: str, username: str):
+        await websocket.accept()
+        if room not in self.active_connections:
+            self.active_connections[room] = []
+            self.photos[room] = []  # init photo history
+        self.active_connections[room].append(websocket)
+        self.usernames[websocket] = username
+        await self.broadcast_system(room, f"{username} joined the room")
+        # Send existing photos to the newly joined user
+        for photo_url in self.photos[room]:
+            await websocket.send_text(f"[PHOTO]{photo_url}")
+
+    def disconnect(self, websocket: WebSocket, room: str):
+        username = self.usernames.get(websocket, "Unknown")
+        if room in self.active_connections:
+            if websocket in self.active_connections[room]:
+                self.active_connections[room].remove(websocket)
+        self.usernames.pop(websocket, None)
+        return username
+
+    async def broadcast(self, room: str, message: str):
+        for connection in self.active_connections.get(room, []):
+            await connection.send_text(message)
+
+    async def broadcast_system(self, room: str, message: str):
+        await self.broadcast(room, f"[SYSTEM]{message}")
+
+
+manager = ConnectionManager()
+
+
+@app.websocket("/ws/chat/{room}/{username}")
+async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
+    await manager.connect(websocket, room, username)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data.startswith("[PHOTO]"):
+                b64_data = data.replace("[PHOTO]", "")
+                try:
+                    header, encoded = b64_data.split(",", 1)
+                    ext = header.split("/")[1].split(";")[0]  # jpg, png
+                    filename = f"{uuid.uuid4()}.{ext}"
+                    file_path = os.path.join(UPLOAD_DIR, filename)
+                    with open(file_path, "wb") as f:
+                        f.write(base64.b64decode(encoded))
+                    photo_url = f"/static/uploads/{filename}"
+                    manager.photos[room].append(photo_url)
+                    await manager.broadcast(room, f"[PHOTO]{photo_url}")
+                except Exception as e:
+                    print("Failed to save photo:", e)
+            else:
+                await manager.broadcast(room, f"{username}: {data}")
+    except WebSocketDisconnect:
+        user_left = manager.disconnect(websocket, room)
+        await manager.broadcast_system(room, f"{user_left} left the room")
 
