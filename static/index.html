@@ -125,6 +125,7 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     border-radius: 6px;
     max-width: 200px;
     position: absolute;
+    z-index: 100;
 }
 
 .emoji-panel span {
@@ -178,11 +179,13 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     <div id="chat"></div>
 
     <div id="message-area">
+        <!-- Emoji picker -->
         <button id="emojiBtn" title="Emojis">😊</button>
         <div id="emojiPanel" class="emoji-panel">
             😀 😁 😂 🤣 😊 😎 😍 😘 😜 🤔 😢 😭 😡 👍 👎 👏 🙌 🎉 ❤️ 🔥 🚀
         </div>
 
+        <!-- Photo upload -->
         <button id="photoBtn" title="Upload Photo">📷</button>
         <input type="file" id="photoInput" style="display:none" accept="image/*">
 
@@ -200,6 +203,7 @@ h2 { margin-bottom: 20px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
 <script>
 let chatWs = null;
 let usersWs = null;
+let username = "";
 
 const chatDiv = document.getElementById("chat");
 const usersDiv = document.getElementById("users");
@@ -214,6 +218,7 @@ const photoBtn = document.getElementById("photoBtn");
 const photoInput = document.getElementById("photoInput");
 const photosHistory = document.getElementById("photos-history");
 
+// Append chat message
 function appendMessage(msg, type="system") {
     const p = document.createElement("p");
     p.textContent = msg;
@@ -222,105 +227,78 @@ function appendMessage(msg, type="system") {
     chatDiv.scroll({ top: chatDiv.scrollHeight, behavior: 'smooth' });
 }
 
-/* CONNECT / JOIN ROOM */
+// Connect / Join room
 connectBtn.onclick = () => {
     const room = document.getElementById("room").value || "room1";
-    const username = document.getElementById("username").value || "user1";
+    username = document.getElementById("username").value || "user1";
     const wsProtocol = location.protocol === "https:" ? "wss" : "ws";
 
     chatWs = new WebSocket(`${wsProtocol}://${window.location.host}/ws/chat/${room}/${username}`);
     chatWs.onmessage = (event) => {
-    const msg = event.data;
-    if(msg.startsWith("[PHOTO]")) {
-        const img = document.createElement("img");
-        img.src = msg.replace("[PHOTO]", "");
-        img.title = "Sent Photo";
-        photosHistory.appendChild(img);
-        chatDiv.scroll({ top: chatDiv.scrollHeight, behavior: 'smooth' });
-    }
-    else if(msg.startsWith(`${username}:`)) appendMessage(msg, "self");
-    else if(msg.includes("joined") || msg.includes("left") || msg.startsWith("[SYSTEM]")) appendMessage(msg.replace("[SYSTEM] ", ""), "system");
-    else appendMessage(msg, "other");
-};
-
-    chatWs.onclose = () => appendMessage("⚠️ Disconnected from chat", "system");
+        const msg = event.data;
+        if(msg.startsWith("[PHOTO]")){
+            const img = document.createElement("img");
+            img.src = msg.replace("[PHOTO]","");
+            img.title="Sent Photo"; photosHistory.appendChild(img);
+            chatDiv.scroll({ top: chatDiv.scrollHeight, behavior: 'smooth' });
+        } else if(msg.startsWith(`${username}:`)) appendMessage(msg,"self");
+        else if(msg.includes("joined")||msg.includes("left")||msg.startsWith("[SYSTEM]")) appendMessage(msg.replace("[SYSTEM] ",""),"system");
+        else appendMessage(msg,"other");
+    };
+    chatWs.onclose = () => appendMessage("⚠️ Disconnected from chat","system");
 
     usersWs = new WebSocket(`${wsProtocol}://${window.location.host}/ws/users/${room}`);
     usersWs.onmessage = (event) => {
         const users = JSON.parse(event.data);
         usersDiv.innerHTML = users.map(u => `<p>${u}</p>`).join("");
     };
-    usersWs.onclose = () => usersDiv.innerHTML = "<p>Disconnected</p>";
+    usersWs.onclose = () => usersDiv.innerHTML="<p>Disconnected</p>";
 
-    appendMessage(`🔵 You joined as ${username}`, "system");
+    appendMessage(`🔵 You joined as ${username}`,"system");
     connectBtn.disabled = true;
     logoutBtn.disabled = false;
 };
 
-/* LOGOUT */
+// Logout
 logoutBtn.onclick = () => {
     if(chatWs) chatWs.close();
     if(usersWs) usersWs.close();
-    appendMessage("🔴 You left the room. Page will refresh in 3 seconds...", "system");
-    usersDiv.innerHTML = "";
-    setTimeout(() => { location.reload(); }, 3000);
+    appendMessage("🔴 You left the room. Page will refresh in 3 seconds...","system");
+    usersDiv.innerHTML="";
+    setTimeout(()=>{ location.reload(); },3000);
 };
 
-/* SEND MESSAGE */
+// Send message
 document.getElementById("sendBtn").onclick = () => {
-    if(chatWs && messageInput.value.trim() !== "") {
+    if(chatWs && messageInput.value.trim() !== ""){
         chatWs.send(messageInput.value);
-        messageInput.value = "";
+        messageInput.value="";
     }
 };
 
-/* SEND MESSAGE ON ENTER */
-messageInput.addEventListener("keypress", (e) => {
-    if(e.key === "Enter") document.getElementById("sendBtn").click();
-});
+// Send on Enter
+messageInput.addEventListener("keypress", e => { if(e.key==="Enter") document.getElementById("sendBtn").click(); });
 
-/* EMOJI PICKER */
-emojiPanel.innerHTML = emojiPanel.textContent
-    .split(" ")
-    .map(e => `<span>${e}</span>`)
-    .join("");
+// Emoji picker
+emojiPanel.innerHTML = emojiPanel.textContent.split(" ").map(e => `<span>${e}</span>`).join("");
+emojiBtn.onclick = () => emojiPanel.style.display = emojiPanel.style.display==="flex"?"none":"flex";
+emojiPanel.addEventListener("click", e => { if(e.target.tagName==="SPAN") { messageInput.value += e.target.textContent; messageInput.focus(); } });
+document.addEventListener("click", e => { if(!emojiBtn.contains(e.target) && !emojiPanel.contains(e.target)) emojiPanel.style.display="none"; });
 
-emojiBtn.onclick = () => {
-    emojiPanel.style.display = emojiPanel.style.display === "flex" ? "none" : "flex";
-};
-
-emojiPanel.addEventListener("click", (e) => {
-    if (e.target.tagName === "SPAN") {
-        messageInput.value += e.target.textContent;
-        messageInput.focus();
-    }
-});
-
-document.addEventListener("click", (e) => {
-    if (!emojiBtn.contains(e.target) && !emojiPanel.contains(e.target)) {
-        emojiPanel.style.display = "none";
-    }
-});
-
-/* PHOTO UPLOAD */
+// Photo upload
 photoBtn.onclick = () => photoInput.click();
-
-photoInput.addEventListener("change", async () => {
+photoInput.addEventListener("change", () => {
     const file = photoInput.files[0];
     if(!file) return;
-
     const reader = new FileReader();
     reader.onload = () => {
         const img = document.createElement("img");
-        img.src = reader.result;
-        img.title = "Sent Photo";
-        photosHistory.appendChild(img);
-
-        // Optionally send photo as base64 string in chat
+        img.src = reader.result; img.title="Sent Photo"; photosHistory.appendChild(img);
         if(chatWs) chatWs.send(`[PHOTO]${reader.result}`);
     };
     reader.readAsDataURL(file);
 });
 </script>
+
 </body>
 </html>
