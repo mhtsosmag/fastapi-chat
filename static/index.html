@@ -230,11 +230,19 @@ connectBtn.onclick = () => {
 
     chatWs = new WebSocket(`${wsProtocol}://${window.location.host}/ws/chat/${room}/${username}`);
     chatWs.onmessage = (event) => {
-        const msg = event.data;
-        if(msg.startsWith(`${username}:`)) appendMessage(msg, "self");
-        else if(msg.includes("joined") || msg.includes("left")) appendMessage(msg, "system");
-        else appendMessage(msg, "other");
-    };
+    const msg = event.data;
+    if(msg.startsWith("[PHOTO]")) {
+        const img = document.createElement("img");
+        img.src = msg.replace("[PHOTO]", "");
+        img.title = "Sent Photo";
+        photosHistory.appendChild(img);
+        chatDiv.scroll({ top: chatDiv.scrollHeight, behavior: 'smooth' });
+    }
+    else if(msg.startsWith(`${username}:`)) appendMessage(msg, "self");
+    else if(msg.includes("joined") || msg.includes("left") || msg.startsWith("[SYSTEM]")) appendMessage(msg.replace("[SYSTEM] ", ""), "system");
+    else appendMessage(msg, "other");
+};
+
     chatWs.onclose = () => appendMessage("⚠️ Disconnected from chat", "system");
 
     usersWs = new WebSocket(`${wsProtocol}://${window.location.host}/ws/users/${room}`);
