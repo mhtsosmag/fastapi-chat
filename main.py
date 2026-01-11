@@ -94,7 +94,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Serve index.html
 @app.get("/")
 async def root():
-    return FileResponse("static/index.html")
+    return FileResponse("static/chat.html")
 
 # WebSocket endpoints
 @app.websocket("/ws/chat/{room}/{username}")
